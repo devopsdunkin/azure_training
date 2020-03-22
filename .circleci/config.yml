@@ -4,7 +4,7 @@ references:
 
 base_image: &base_image hashicorp/terraform:light
 
-working_directory: &working_directory ~/tf
+working_directory: &working_directory ~/project
 
 default_config: &default_config
   docker:
