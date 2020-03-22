@@ -4,7 +4,7 @@ references:
 
 base_image: &base_image hashicorp/terraform:light
 
-working_directory: &working_directory ~/project
+working_directory: &working_directory ~/tf
 
 default_config: &default_config
   docker:
@@ -12,7 +12,7 @@ default_config: &default_config
   working_directory: *working_directory
   environment:
     BASH_ENV: /root/.bashrc
-    TERRAFORM_ENV: ~/project/
+    TERRAFORM_ENV: ~/tf/
 
 repo_cache_key: &repo_cache_key v1-repo-{{ .Branch }}-{{ .Revision }}
 
@@ -31,13 +31,13 @@ set_terraform_environment: &set_terraform_environment
     name: set terraform environment
     command: |
       cd && touch $BASH_ENV
-      cd ~/project/
+      cd ~/tf/
 terraform_init: &terraform_init
   run:
     name: terraform init
     command: |
       source $BASH_ENV
-      cd ~/project/
+      cd ~/tf/
       terraform init -backend-config="token=${TF_API_TOKEN}"
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
           name: terraform fmt
           command: |
             source $BASH_ENV
-            cd ~/project/
+            cd ~/tf/
             terraform init -backend-config="token=${TF_API_TOKEN}"
             terraform fmt
       - *save_repo
@@ -66,7 +66,7 @@ jobs:
           name: terraform plan
           command: |
             source $BASH_ENV
-            cd ~/project/
+            cd ~/tf/
             terraform plan
   apply:
     <<: *default_config
@@ -78,22 +78,8 @@ jobs:
           name: terraform apply
           command: |
             source $BASH_ENV
-            cd ~/project/
+            cd ~/tf/
             terraform apply --auto-approve
-
-  deployment:
-    docker: [{ image: "circleci/python:latest" }]
-    working_directory: "~/project"
-
-    steps:
-      - *restore_repo
-      - *set_terraform_environment
-      - run:
-          name: "Push to S3"
-          command: |
-            pip install --user awscli
-            export PATH="~/.local/bin:$PATH"
-            aws s3 sync --acl public-read "/home/circleci/project/assets" s3://${APP_BUCKET}
 
   destroy:
     <<: *default_config
@@ -105,7 +91,7 @@ jobs:
           name: "Destruction of env"
           command: |
             source $BASH_ENV
-            cd ~/project/
+            cd ~/tf/
             terraform destroy --auto-approve
 
 workflows:
