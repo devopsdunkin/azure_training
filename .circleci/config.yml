@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  azure-cli: circleci/azure-cli@1.0.0
 
 references:
 
@@ -44,6 +46,7 @@ jobs:
 
   build:
     <<: *default_config
+    executor: azure-cli/default
     steps:
       - checkout
       - *set_terraform_environment
@@ -58,6 +61,7 @@ jobs:
 
   plan:
     <<: *default_config
+    executor: azure-cli/default
     steps:
       - *restore_repo
       - *set_terraform_environment
@@ -70,6 +74,7 @@ jobs:
             terraform plan
   apply:
     <<: *default_config
+    executor: azure-cli/default
     steps:
       - *restore_repo
       - *set_terraform_environment
@@ -83,6 +88,7 @@ jobs:
 
   destroy:
     <<: *default_config
+    executor: azure-cli/default
     steps:
       - *restore_repo
       - *set_terraform_environment
