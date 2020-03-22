@@ -1,0 +1,120 @@
+version: 2.1
+
+references:
+
+base_image: &base_image hashicorp/terraform:light
+
+working_directory: &working_directory ~/project
+
+default_config: &default_config
+  docker:
+    - image: *base_image
+  working_directory: *working_directory
+  environment:
+    BASH_ENV: /root/.bashrc
+    TERRAFORM_ENV: ~/project/
+
+repo_cache_key: &repo_cache_key v1-repo-{{ .Branch }}-{{ .Revision }}
+
+restore_repo: &restore_repo
+  restore_cache:
+    key: *repo_cache_key
+
+save_repo: &save_repo
+  save_cache:
+    key: *repo_cache_key
+    paths:
+      - *working_directory
+
+set_terraform_environment: &set_terraform_environment
+  run:
+    name: set terraform environment
+    command: |
+      cd && touch $BASH_ENV
+      cd ~/project/
+terraform_init: &terraform_init
+  run:
+    name: terraform init
+    command: |
+      source $BASH_ENV
+      cd ~/project/
+      terraform init -backend-config="token=${TF_API_TOKEN}"
+
+jobs:
+
+  build:
+    <<: *default_config
+    steps:
+      - checkout
+      - *set_terraform_environment
+      - run:
+          name: terraform fmt
+          command: |
+            source $BASH_ENV
+            cd ~/project/
+            terraform init -backend-config="token=${TF_API_TOKEN}"
+            terraform fmt
+      - *save_repo
+
+  plan:
+    <<: *default_config
+    steps:
+      - *restore_repo
+      - *set_terraform_environment
+      - *terraform_init
+      - run:
+          name: terraform plan
+          command: |
+            source $BASH_ENV
+            cd ~/project/
+            terraform plan
+  apply:
+    <<: *apply_job
+  apply-with-approval:
+    <<: *apply_job
+
+  deployment:
+    docker: [{ image: "circleci/python:latest" }]
+    working_directory: "~/project"
+
+    steps:
+      - *restore_repo
+      - *set_terraform_environment
+      - run:
+          name: "Push to S3"
+          command: |
+            pip install --user awscli
+            export PATH="~/.local/bin:$PATH"
+            aws s3 sync --acl public-read "/home/circleci/project/assets" s3://${APP_BUCKET}
+
+  destroy:
+    <<: *default_config
+    steps:
+      - *restore_repo
+      - *set_terraform_environment
+      - *terraform_init
+      - run:
+          name: "Destruction of env"
+          command: |
+            source $BASH_ENV
+            cd ~/project/
+            terraform destroy --auto-approve
+
+workflows:
+  version: 2
+  build_plan_approve_apply:
+    jobs:
+      - build
+      - plan:
+          requires:
+            - build
+      - apply:
+          requires:
+            - plan
+      - hold:
+          type: approval
+          requires:
+            - deployment
+      - destroy:
+          requires:
+            - hold
