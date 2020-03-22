@@ -122,7 +122,7 @@ workflows:
       - hold:
           type: approval
           requires:
-            - deployment
+            - apply
       - destroy:
           requires:
             - hold
